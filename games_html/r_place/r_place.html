@@ -115,6 +115,15 @@
             color: #777777;
             text-align: center;
         }
+        .admin-badge {
+            background-color: #4fc1ff;
+            color: #1e1e1e;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            display: none;
+        }
     </style>
 </head>
 <body>
@@ -138,8 +147,11 @@
         </div>
 
         <button id="download-btn">📥 Download PNG</button>
+        <button id="admin-btn">🔑 Admin Lock</button>
+        <button id="delete-btn" style="display: none; background-color: #a61c1c; border-color: #801212;">🗑️ Delete Backup</button>
         
         <span id="view-indicator" class="view-mode-indicator">⚠️ ARCHIVE VIEW (Read-Only)</span>
+        <span id="admin-badge" class="admin-badge">ADMIN MODE</span>
     </div>
 
     <div class="canvas-container">
@@ -163,6 +175,9 @@
         const cooldownDisplay = document.getElementById('cooldown');
         const colorPicker = document.getElementById('color-picker');
         const downloadBtn = document.getElementById('download-btn');
+        const adminBtn = document.getElementById('admin-btn');
+        const deleteBtn = document.getElementById('delete-btn');
+        const adminBadge = document.getElementById('admin-badge');
         
         const btnZoomIn = document.getElementById('zoom-in');
         const btnZoomOut = document.getElementById('zoom-out');
@@ -173,6 +188,8 @@
         
         let zoomLevels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
         let currentZoomIndex = 2;
+        let isAdmin = false;
+        let adminPassword = "3.1415926535";
 
         function loadLiveCanvas() {
             ctx.fillStyle = '#FFFFFF';
@@ -196,6 +213,7 @@
             fetch('save_backup.php')
             .then(res => res.json())
             .then(backups => {
+                const currentSelection = archiveSelect.value;
                 archiveSelect.innerHTML = '<option value="live">-- Current Live Canvas --</option>';
                 backups.forEach(backup => {
                     const option = document.createElement('option');
@@ -203,6 +221,9 @@
                     option.textContent = `Snapshot: ${backup.month}`;
                     archiveSelect.appendChild(option);
                 });
+                archiveSelect.value = currentSelection;
+                if (!archiveSelect.value) archiveSelect.value = 'live';
+                toggleDeleteButton();
             })
             .catch(err => console.error("Error loading archive:", err));
         }
@@ -229,22 +250,37 @@
             localStorage.setItem('place_last_month_checked_1024', currentMonthStr);
         }
 
+        function toggleDeleteButton() {
+            if (isAdmin && archiveSelect.value !== 'live') {
+                deleteBtn.style.display = 'inline-block';
+            } else {
+                deleteBtn.style.display = 'none';
+            }
+        }
+
         archiveSelect.addEventListener('change', (e) => {
             const path = e.target.value;
+            toggleDeleteButton();
             if (path === 'live') {
                 loadLiveCanvas();
                 viewIndicator.style.display = 'none';
-                colorPicker.disabled = false;
+                if (!isAdmin) colorPicker.disabled = false;
             } else {
                 const img = new Image();
                 img.onload = () => ctx.drawImage(img, 0, 0);
                 img.src = path;
                 viewIndicator.style.display = 'inline';
-                colorPicker.disabled = true;
+                if (!isAdmin) colorPicker.disabled = true;
             }
         });
 
         function checkCooldown() {
+            if (isAdmin) {
+                cooldownDisplay.textContent = "Bypassed!";
+                cooldownDisplay.style.color = "#4fc1ff";
+                return true;
+            }
+            cooldownDisplay.style.color = "#f48771";
             const lastPlacement = localStorage.getItem('place_last_placement_time_1024');
             if (!lastPlacement) return true;
 
@@ -257,6 +293,7 @@
         }
 
         function startCooldownTimer(duration) {
+            if (isAdmin) return;
             let remaining = Math.ceil(duration / 1000);
             
             function formatTime(secs) {
@@ -268,6 +305,12 @@
             cooldownDisplay.textContent = formatTime(remaining);
             
             const interval = setInterval(() => {
+                if (isAdmin) {
+                    clearInterval(interval);
+                    cooldownDisplay.textContent = "Bypassed!";
+                    cooldownDisplay.style.color = "#4fc1ff";
+                    return;
+                }
                 remaining--;
                 if (remaining <= 0) {
                     clearInterval(interval);
@@ -279,7 +322,7 @@
         }
 
         canvas.addEventListener('click', (e) => {
-            if (archiveSelect.value !== 'live') return;
+            if (archiveSelect.value !== 'live' && !isAdmin) return;
             if (!checkCooldown()) return; 
 
             const rect = canvas.getBoundingClientRect();
@@ -293,9 +336,99 @@
                 ctx.fillStyle = colorPicker.value;
                 ctx.fillRect(pixelX, pixelY, 1, 1);
                 
-                localStorage.setItem('place_live_image_1024', canvas.toDataURL());
-                localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
-                startCooldownTimer(COOLDOWN_TIME);
+                if (archiveSelect.value === 'live') {
+                    localStorage.setItem('place_live_image_1024', canvas.toDataURL());
+                    if (!isAdmin) {
+                        localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
+                        startCooldownTimer(COOLDOWN_TIME);
+                    }
+                } else if (isAdmin) {
+                    // Overwriting an archived image directly on the server
+                    const selectedPath = archiveSelect.value;
+                    const monthName = selectedPath.split('place_').pop().replace('.png', '');
+                    
+                    fetch('save_backup.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            image: canvas.toDataURL(),
+                            month: monthName,
+                            password: adminPassword
+                        })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            alert("Archive backup successfully overwritten!");
+                        } else {
+                            alert("Failed to overwrite archive: " + data.message);
+                        }
+                    });
+                }
+            }
+        });
+
+        adminBtn.addEventListener('click', () => {
+            if (isAdmin) {
+                isAdmin = false;
+                adminPassword = "";
+                adminBtn.textContent = "🔑 Admin Lock";
+                adminBadge.style.display = "none";
+                colorPicker.disabled = archiveSelect.value !== 'live';
+                checkCooldown();
+                toggleDeleteButton();
+            } else {
+                const pass = prompt("Enter Admin Password:");
+                if (pass) {
+                    fetch('save_backup.php', {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ password: pass })
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === 'success') {
+                            isAdmin = true;
+                            adminPassword = pass;
+                            adminBtn.textContent = "🔓 Logout Admin";
+                            adminBadge.style.display = "inline-block";
+                            colorPicker.disabled = false;
+                            checkCooldown();
+                            toggleDeleteButton();
+                        } else {
+                            alert("Invalid password.");
+                        }
+                    });
+                }
+            }
+        });
+
+        deleteBtn.addEventListener('click', () => {
+            if (!isAdmin || archiveSelect.value === 'live') return;
+            const selectedPath = archiveSelect.value;
+            const filename = selectedPath.split('/').pop();
+            
+            if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                fetch('save_backup.php', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        filename: filename,
+                        password: adminPassword
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') {
+                        alert("Backup deleted successfully.");
+                        archiveSelect.value = 'live';
+                        loadLiveCanvas();
+                        viewIndicator.style.display = 'none';
+                        fetchArchiveList();
+                    } else {
+                        alert("Deletion failed: " + data.message);
+                    }
+                });
             }
         });
 
@@ -311,24 +444,9 @@
             link.click();
         });
 
-        btnZoomIn.addEventListener('click', () => {
-            if (currentZoomIndex < zoomLevels.length - 1) {
-                currentZoomIndex++;
-                updateZoom();
-            }
-        });
-
-        btnZoomOut.addEventListener('click', () => {
-            if (currentZoomIndex > 0) {
-                currentZoomIndex--;
-                updateZoom();
-            }
-        });
-
-        btnReset.addEventListener('click', () => {
-            currentZoomIndex = 2;
-            updateZoom();
-        });
+        btnZoomIn.addEventListener('click', () => { if (currentZoomIndex < zoomLevels.length - 1) { currentZoomIndex++; updateZoom(); } });
+        btnZoomOut.addEventListener('click', () => { if (currentZoomIndex > 0) { currentZoomIndex--; updateZoom(); } });
+        btnReset.addEventListener('click', () => { currentZoomIndex = 2; updateZoom(); });
 
         loadLiveCanvas();
         fetchArchiveList();
