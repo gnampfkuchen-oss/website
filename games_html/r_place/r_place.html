@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>r/place Clone (1024x1024)</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            user-select: none;
+        }
+        h1 { color: #1a1a1b; margin-bottom: 15px; }
+        .controls {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 15px;
+            align-items: center;
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .canvas-container {
+            width: 800px;
+            height: 600px;
+            border: 3px solid #ccc;
+            background: #fff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            overflow: auto; /* Enable native scrollbars when zoomed in */
+            position: relative;
+        }
+        canvas {
+            image-rendering: pixelated;
+            cursor: crosshair;
+            display: block;
+            transform-origin: top left;
+        }
+        .palette-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            background: white;
+            padding: 10px 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            align-items: center;
+        }
+        .color-picker-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        input[type="color"] {
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+            background: none;
+        }
+        input[type="color"]:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+        .view-mode-indicator { color: #ff4500; font-weight: bold; display: none; }
+        #cooldown { font-weight: bold; color: #ff4500; min-width: 100px; text-align: center; }
+        button, select { padding: 8px 14px; border-radius: 4px; border: 1px solid #ccc; background: white; cursor: pointer; font-size: 14px; }
+        button:hover { background: #f0f0f0; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .zoom-display { font-size: 14px; font-weight: bold; color: #444; min-width: 60px; text-align: center; }
+    </style>
+</head>
+<body>
+
+    <h1>r/place Clone (1024x1024)</h1>
+    
+    <div class="controls">
+        <div>
+            <label for="archive-select">📂 Archive:</label>
+            <select id="archive-select">
+                <option value="live">-- Current Live Canvas --</option>
+            </select>
+        </div>
+        
+        <div id="cooldown">Ready!</div>
+        
+        <div>
+            <button id="zoom-in">🔍 Zoom In</button>
+            <span class="zoom-display" id="zoom-val">100%</span>
+            <button id="zoom-out">🔍 Zoom Out</button>
+        </div>
+
+        <button id="download-btn">📥 Download PNG</button>
+        <span id="view-indicator" class="view-mode-indicator">⚠️ ARCHIVE VIEW (Read-Only)</span>
+    </div>
+
+    <div class="canvas-container" id="canvas-container">
+        <!-- Native 1024x1024 Canvas -->
+        <canvas id="placeCanvas" width="1024" height="1024"></canvas>
+    </div>
+
+    <div class="palette-container" id="palette-container">
+        <div class="color-picker-wrapper">
+            <label for="colorPicker" style="font-size: 14px; font-weight: bold;">Select Color:</label>
+            <input type="color" id="colorPicker" value="#222222">
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('placeCanvas');
+        const ctx = canvas.getContext('2d');
+        const container = document.getElementById('canvas-container');
+        const archiveSelect = document.getElementById('archive-select');
+        const viewIndicator = document.getElementById('view-indicator');
+        const cooldownDisplay = document.getElementById('cooldown');
+        const colorPicker = document.getElementById('colorPicker');
+        const downloadBtn = document.getElementById('download-btn');
+        
+        const btnZoomIn = document.getElementById('zoom-in');
+        const btnZoomOut = document.getElementById('zoom-out');
+        const zoomVal = document.getElementById('zoom-val');
+
+        const CANVAS_SIZE = 1024;
+        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 Minutes
+        
+        // Zoom configurations
+        const zoomLevels = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
+        let currentZoomIndex = 3; // Starts at 100% (index 3)
+
+        function updateZoom() {
+            const currentZoom = zoomLevels[currentZoomIndex];
+            
+            // Calculate current scroll center percentages before zoom
+            const scrollLeftPercent = container.scrollLeft / (container.scrollWidth - container.clientWidth || 1);
+            const scrollTopPercent = container.scrollTop / (container.scrollHeight - container.clientHeight || 1);
+            
+            // Set dynamic visual dimensions via styling for native scroll overflow behavior
+            const visualSize = CANVAS_SIZE * currentZoom;
+            canvas.style.width = visualSize + 'px';
+            canvas.style.height = visualSize + 'px';
+            
+            // Render text feedback
+            zoomVal.textContent = Math.round(currentZoom * 100) + '%';
+            
+            // Keep container scrolling positions matching original relative center points
+            container.scrollLeft = scrollLeftPercent * (container.scrollWidth - container.clientWidth);
+            container.scrollTop = scrollTopPercent * (container.scrollHeight - container.clientHeight);
+        }
+
+        function loadLiveCanvas() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            const savedData = localStorage.getItem('place_live_1024');
+            if (savedData) {
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = savedData;
+            }
+        }
+
+        function fetchArchiveList() {
+            fetch('save_backup.php')
+            .then(res => res.json())
+            .then(backups => {
+                archiveSelect.innerHTML = '<option value="live">-- Current Live Canvas --</option>';
+                backups.forEach(backup => {
+                    const option = document.createElement('option');
+                    option.value = backup.url;
+                    option.textContent = `Snapshot: ${backup.month}`;
+                    archiveSelect.appendChild(option);
+                });
+            })
+            .catch(err => console.error("Error loading archive:", err));
+        }
+
+        function checkMonthlyBackup() {
+            const now = new Date();
+            const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+            const lastCheckedMonth = localStorage.getItem('place_1024_month_checked');
+
+            if (lastCheckedMonth && lastCheckedMonth !== currentMonthStr) {
+                fetch('save_backup.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image: canvas.toDataURL(),
+                        month: lastCheckedMonth
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.status === 'success') fetchArchiveList();
+                });
+            }
+            localStorage.setItem('place_1024_month_checked', currentMonthStr);
+        }
+
+        archiveSelect.addEventListener('change', (e) => {
+            const path = e.target.value;
+            if (path === 'live') {
+                loadLiveCanvas();
+                viewIndicator.style.display = 'none';
+                colorPicker.disabled = false;
+            } else {
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = path;
+                viewIndicator.style.display = 'inline';
+                colorPicker.disabled = true; // Lock color modifications
+            }
+        });
+
+        // Cooldown Checks
+        function checkCooldown() {
+            const lastPlacement = localStorage.getItem('place_1024_last_time');
+            if (!lastPlacement) return true;
+
+            const elapsed = Date.now() - parseInt(lastPlacement);
+            if (elapsed < COOLDOWN_TIME) {
+                startCooldownTimer(COOLDOWN_TIME - elapsed);
+                return false;
+            }
+            return true;
+        }
+
+        function startCooldownTimer(duration) {
+            let remaining = Math.ceil(duration / 1000);
+            
+            function formatTime(secs) {
+                const m = Math.floor(secs / 60);
+                const s = secs % 60;
+                return `Wait: ${m}:${s.toString().padStart(2, '0')}`;
+            }
+
+            cooldownDisplay.textContent = formatTime(remaining);
+            
+            const interval = setInterval(() => {
+                remaining--;
+                if (remaining <= 0) {
+                    clearInterval(interval);
+                    cooldownDisplay.textContent = "Ready!";
+                } else {
+                    cooldownDisplay.textContent = formatTime(remaining);
+                }
+            }, 1000);
+        }
+
+        // Handle drawing clicks
+        canvas.addEventListener('click', (e) => {
+            if (archiveSelect.value !== 'live') return; // Read-only mode
+            if (!checkCooldown()) return; // Locked by cooldown timer
+
+            // Extract relative canvas offsets mapping exact scaled display sizing
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            const currentZoom = zoomLevels[currentZoomIndex];
+            const pixelX = Math.floor(clickX / currentZoom);
+            const pixelY = Math.floor(clickY / currentZoom);
+
+            if (pixelX >= 0 && pixelX < CANVAS_SIZE && pixelY >= 0 && pixelY < CANVAS_SIZE) {
+                ctx.fillStyle = colorPicker.value;
+                ctx.fillRect(pixelX, pixelY, 1, 1);
+                
+                localStorage.setItem('place_live_1024', canvas.toDataURL());
+                localStorage.setItem('place_1024_last_time', Date.now().toString());
+                startCooldownTimer(COOLDOWN_TIME);
+            }
+        });
+
+        // Download currently loaded view state as full raw PNG file
+        downloadBtn.addEventListener('click', () => {
+            const selection = archiveSelect.value;
+            const nameSuffix = selection === 'live' ? 'live' : archiveSelect.options[archiveSelect.selectedIndex].text.replace('Snapshot: ', '');
+            
+            const link = document.createElement('a');
+            link.download = `r-place-${nameSuffix}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        });
+
+        // Native button listeners for zooming actions
+        btnZoomIn.addEventListener('click', () => {
+            if (currentZoomIndex < zoomLevels.length - 1) {
+                currentZoomIndex++;
+                updateZoom();
+            }
+        });
+
+        btnZoomOut.addEventListener('click', () => {
+            if (currentZoomIndex > 0) {
+                currentZoomIndex--;
+                updateZoom();
+            }
+        });
+
+        // Core initialization loops
+        loadLiveCanvas();
+        updateZoom();
+        fetchArchiveList();
+        checkMonthlyBackup();
+        checkCooldown();
+    </script>
+</body>
+</html>

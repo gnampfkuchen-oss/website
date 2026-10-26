@@ -48,7 +48,7 @@
             object-fit: cover;
             background-color: #111;
         }
-        /* Textbereich */
+        /* Textbereich innerhalb der Kachel */
         .game-info {
             padding: 15px;
             display: flex;
@@ -74,56 +74,60 @@
 <body>
 
     <h1>My Games</h1>
+    
+    <!-- Hier fügt JavaScript die Kacheln automatisch ein -->
     <div id="games-container" class="games-grid"></div>
 
     <script>
-        // Hier trägst du deine Spiele ein.
-        // Der Name (z.B. "test") bestimmt, wo nach txt/Bild (games/test/) 
-        // und wo nach der HTML-Datei (games_html/test.html) gesucht wird.
+        // HIER DEINE SPIELE EINTRAGEN
+        // Das Skript sucht nach:
+        // - Bild & Text in: games/ordnerName/
+        // - Der HTML-Datei in: games_html/ordnerName/ordnerName.html
         const spiele = [
-            { ordnerName: "test", bild: "picture.png" },
-            // { ordnerName: "pacman", bild: "thumbnail.png" } <-- So fügst du neue Spiele hinzu
+            { ordnerName: "r_place", bild: "picture.png"}
+            // { ordnerName: "spaceshooter", bild: "logo.png" } <-- So fügst du neue Spiele hinzu
         ];
 
         const container = document.getElementById('games-container');
 
-        // Funktion, um eine Kachel zu erstellen und die txt auszulesen
+        // Funktion, um eine Kachel zu erstellen und die txt-Daten zu laden
         async function erstelleKachel(game) {
-            let titel = game.ordnerName; // Standard-Fallback, falls txt fehlt
-            let beschreibung = "No Description.";
+            let titel = game.ordnerName; // Fallback-Titel (Ordnername)
+            let beschreibung = "Keine Beschreibung verfügbar.";
 
             const pfadZuDateien = `games/${game.ordnerName}`;
             
-            // Ziel-HTML-Datei im Ordner games_html (z.B. games_html/test.html)
-            const zielHtmlPfad = `games_html/${game.ordnerName}.html`;
+            // Neuer Pfad: Öffnet das Spiel im eigenen Unterordner (z.B. games_html/test/test.html)
+            const zielHtmlPfad = `games_html/${game.ordnerName}/${game.ordnerName}.html`;
 
             try {
-                // Lädt die game.txt im Hintergrund
+                // Lädt die game.txt Datei im Hintergrund
                 const response = await fetch(`${pfadZuDateien}/game.txt`);
                 if (response.ok) {
                     const text = await response.text();
-                    // Teilt den Text zeilenweise auf
+                    
+                    // Teilt den Text bei Zeilenumbrüchen auf
                     const zeilen = text.split('\n');
                     
-                    // Zeile 1 extrahieren und Leerzeichen entfernen
+                    // Zeile 1 extrahieren (Titel) und unnötige Leerzeichen abschneiden
                     if (zeilen[0] && zeilen[0].trim() !== "") {
                         titel = zeilen[0].trim();
                     }
-                    // Zeile 2 extrahieren
+                    // Zeile 2 extrahieren (Beschreibung)
                     if (zeilen[1] && zeilen[1].trim() !== "") {
                         beschreibung = zeilen[1].trim();
                     }
                 }
             } catch (error) {
-                beschreibung = "Error";
+                beschreibung = "ERROR";
             }
 
             // Kachel-Link erstellen
             const kachel = document.createElement('a');
             kachel.className = 'game-card';
-            kachel.href = zielHtmlPfad;
+            kachel.href = zielHtmlPfad; // Link zum Spielunterordner im selben Fenster
 
-            // HTML-Inhalt für die Kachel einfügen
+            // HTML-Struktur der Kachel zusammenbauen
             kachel.innerHTML = `
                 <img class="game-image" src="${pfadZuDateien}/${game.bild}" alt="${titel}" onerror="this.style.display='none'">
                 <div class="game-info">
@@ -132,10 +136,11 @@
                 </div>
             `;
 
+            // Kachel auf der Webseite anzeigen
             container.appendChild(kachel);
         }
 
-        // Alle Spiele aus der Liste nacheinander generieren
+        // Alle eingetragenen Spiele nacheinander durchgehen
         spiele.forEach(game => erstelleKachel(game));
     </script>
 </body>
