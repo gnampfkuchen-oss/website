@@ -51,6 +51,7 @@
             image-rendering: pixelated;
             cursor: crosshair;
             transform-origin: top left;
+            background-color: #ffffff;
         }
         .palette-area {
             display: flex;
@@ -142,7 +143,7 @@
 
     <div class="palette-area">
         <label for="color-picker" style="font-weight: bold;">Choose Color:</label>
-        <input type="color" id="color-picker" value="#ffffff">
+        <input type="color" id="color-picker" value="#000000">
     </div>
     
     <div class="instructions">
@@ -163,23 +164,28 @@
         const btnReset = document.getElementById('reset-cam');
 
         const CANVAS_SIZE = 1024;
-        const COOLDOWN_TIME = 5 * 60 * 1000;
+        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 Minutes
+        let cooldownInterval = null;
         
         let zoomLevels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
-        let currentZoomIndex = 2;
+        let currentZoomIndex = 2; 
 
-        // Load canvas image directly from the server file instead of localStorage
-        function loadCanvasImage(url, isLive = false) {
-            const img = new Image();
-            img.onload = () => {
-                ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-                ctx.drawImage(img, 0, 0);
-                if (isLive) {
-                    checkMonthlyBackup();
+        function loadLiveCanvas() {
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+            
+            fetch('save_backup.php?action=load_live')
+            .then(res => res.json())
+            .then(data => {
+                if (data.image) {
+                    const img = new Image();
+                    img.onload = () => { ctx.drawImage(img, 0, 0); };
+                    img.src = data.image;
                 }
-            };
-            // Cache busting for the live image to always get the latest state
-            img.src = url + (isLive ? '?t=' + Date.now() : '');
+            })
+            .catch(err => console.error("Error connecting to server image:", err));
+            
+            updateZoom();
         }
 
         function updateZoom() {
@@ -200,7 +206,7 @@
                     archiveSelect.appendChild(option);
                 });
             })
-            .catch(err => console.error("Error loading archive:", err));
+            .catch(err => console.error("Error loading archive list:", err));
         }
 
         function checkMonthlyBackup() {
@@ -213,15 +219,12 @@
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: 'archive',
                         image: canvas.toDataURL(),
                         month: lastCheckedMonth
                     })
                 })
                 .then(res => res.json())
-                .then(data => {
-                    if (data.status === 'success') fetchArchiveList();
-                });
+                .then(() => fetchArchiveList());
             }
             localStorage.setItem('place_last_month_checked_1024', currentMonthStr);
         }
@@ -229,11 +232,13 @@
         archiveSelect.addEventListener('change', (e) => {
             const path = e.target.value;
             if (path === 'live') {
-                loadCanvasImage('canvas.png', true);
+                loadLiveCanvas();
                 viewIndicator.style.display = 'none';
                 colorPicker.disabled = false;
             } else {
-                loadCanvasImage(path, false);
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.src = path;
                 viewIndicator.style.display = 'inline';
                 colorPicker.disabled = true;
             }
@@ -241,17 +246,22 @@
 
         function checkCooldown() {
             const lastPlacement = localStorage.getItem('place_last_placement_time_1024');
-            if (!lastPlacement) return true;
+            if (!lastPlacement) {
+                cooldownDisplay.textContent = "Ready!";
+                return true;
+            }
 
             const elapsed = Date.now() - parseInt(lastPlacement);
             if (elapsed < COOLDOWN_TIME) {
                 startCooldownTimer(COOLDOWN_TIME - elapsed);
                 return false;
             }
+            cooldownDisplay.textContent = "Ready!";
             return true;
         }
 
         function startCooldownTimer(duration) {
+            if (cooldownInterval) clearInterval(cooldownInterval);
             let remaining = Math.ceil(duration / 1000);
             
             function formatTime(secs) {
@@ -262,10 +272,10 @@
 
             cooldownDisplay.textContent = formatTime(remaining);
             
-            const interval = setInterval(() => {
+            cooldownInterval = setInterval(() => {
                 remaining--;
                 if (remaining <= 0) {
-                    clearInterval(interval);
+                    clearInterval(cooldownInterval);
                     cooldownDisplay.textContent = "Ready!";
                 } else {
                     cooldownDisplay.textContent = formatTime(remaining);
@@ -285,37 +295,25 @@
             const pixelY = Math.floor((e.clientY - rect.top) * scaleY);
 
             if (pixelX >= 0 && pixelX < CANVAS_SIZE && pixelY >= 0 && pixelY < CANVAS_SIZE) {
-                // Optimistically draw on client
-                ctx.fillStyle = colorPicker.value;
-                ctx.fillRect(pixelX, pixelY, 1, 1);
+                const chosenColor = colorPicker.value;
                 
-                // Set Cooldown
                 localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
                 startCooldownTimer(COOLDOWN_TIME);
 
-                // Send pixel payload to server to modify canvas.png file directly
+                ctx.fillStyle = chosenColor;
+                ctx.fillRect(pixelX, pixelY, 1, 1);
+                
                 fetch('save_backup.php', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
-                        action: 'draw',
+                        action: 'paint',
                         x: pixelX,
                         y: pixelY,
-                        color: colorPicker.value
+                        color: chosenColor
                     })
                 })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.status !== 'success') {
-                        console.error("Server update failed");
-                        // Reload correct server image in case of error
-                        loadCanvasImage('canvas.png', false);
-                    }
-                })
-                .catch(err => {
-                    console.error("Network error:", err);
-                    loadCanvasImage('canvas.png', false);
-                });
+                .catch(err => console.error("Server synchronization failed:", err));
             }
         });
 
@@ -346,13 +344,13 @@
         });
 
         btnReset.addEventListener('click', () => {
-            currentZoomIndex = 2;
+            currentZoomIndex = 2; 
             updateZoom();
         });
 
-        // App Initialisation - load live server file directly
-        loadCanvasImage('canvas.png', true);
+        loadLiveCanvas();
         fetchArchiveList();
+        checkMonthlyBackup();
         checkCooldown();
     </script>
 </body>
