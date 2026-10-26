@@ -1,1 +1,143 @@
-<h1>Nothing Here Yet!</h1>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Games</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
+            margin: 40px;
+        }
+        h1 {
+            color: #ffffff;
+            border-bottom: 1px solid #3c3c3c;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        /* Grid-Layout für die Kacheln */
+        .games-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+        /* Style für eine einzelne Kachel */
+        .game-card {
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s, box-shadow 0.2s;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+        }
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 15px rgba(0,0,0,0.3);
+            border-color: #4fc1ff;
+        }
+        /* Das Bild oben in der Kachel */
+        .game-image {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            background-color: #111;
+        }
+        /* Textbereich */
+        .game-info {
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        /* Erste Zeile aus game.txt */
+        .game-title {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #ffffff;
+            margin: 0;
+        }
+        /* Zweite Zeile aus game.txt */
+        .game-description {
+            font-size: 0.95rem;
+            color: #aaaaaa;
+            margin: 0;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>My Games</h1>
+    <div id="games-container" class="games-grid"></div>
+
+    <script>
+        // Hier trägst du deine Spiele ein.
+        // Der Name (z.B. "test") bestimmt, wo nach txt/Bild (games/test/) 
+        // und wo nach der HTML-Datei (games_html/test.html) gesucht wird.
+        const spiele = [
+            { ordnerName: "test", bild: "picture.png" },
+            // { ordnerName: "pacman", bild: "thumbnail.png" } <-- So fügst du neue Spiele hinzu
+        ];
+
+        const container = document.getElementById('games-container');
+
+        // Funktion, um eine Kachel zu erstellen und die txt auszulesen
+        async function erstelleKachel(game) {
+            let titel = game.ordnerName; // Standard-Fallback, falls txt fehlt
+            let beschreibung = "No Description.";
+
+            const pfadZuDateien = `games/${game.ordnerName}`;
+            
+            // Ziel-HTML-Datei im Ordner games_html (z.B. games_html/test.html)
+            const zielHtmlPfad = `games_html/${game.ordnerName}.html`;
+
+            try {
+                // Lädt die game.txt im Hintergrund
+                const response = await fetch(`${pfadZuDateien}/game.txt`);
+                if (response.ok) {
+                    const text = await response.text();
+                    // Teilt den Text zeilenweise auf
+                    const zeilen = text.split('\n');
+                    
+                    // Zeile 1 extrahieren und Leerzeichen entfernen
+                    if (zeilen[0] && zeilen[0].trim() !== "") {
+                        titel = zeilen[0].trim();
+                    }
+                    // Zeile 2 extrahieren
+                    if (zeilen[1] && zeilen[1].trim() !== "") {
+                        beschreibung = zeilen[1].trim();
+                    }
+                }
+            } catch (error) {
+                beschreibung = "Error";
+            }
+
+            // Kachel-Link erstellen
+            const kachel = document.createElement('a');
+            kachel.className = 'game-card';
+            kachel.href = zielHtmlPfad;
+            kachel.target = "_blank"; // Öffnet das Spiel in einem neuen Tab
+
+            // HTML-Inhalt für die Kachel einfügen
+            kachel.innerHTML = `
+                <img class="game-image" src="${pfadZuDateien}/${game.bild}" alt="${titel}" onerror="this.style.display='none'">
+                <div class="game-info">
+                    <h2 class="game-title">${titel}</h2>
+                    <p class="game-description">${beschreibung}</p>
+                </div>
+            `;
+
+            container.appendChild(kachel);
+        }
+
+        // Alle Spiele aus der Liste nacheinander generieren
+        spiele.forEach(game => erstelleKachel(game));
+    </script>
+</body>
+</html>
