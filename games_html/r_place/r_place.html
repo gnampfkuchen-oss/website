@@ -51,7 +51,6 @@
             image-rendering: pixelated;
             cursor: crosshair;
             transform-origin: top left;
-            background-color: #ffffff;
         }
         .palette-area {
             display: flex;
@@ -103,6 +102,12 @@
             color: #f48771;
             font-weight: bold;
             display: none;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
         }
         .instructions {
             margin-top: 15px;
@@ -143,7 +148,7 @@
 
     <div class="palette-area">
         <label for="color-picker" style="font-weight: bold;">Choose Color:</label>
-        <input type="color" id="color-picker" value="#000000">
+        <input type="color" id="color-picker" value="#ffffff">
     </div>
     
     <div class="instructions">
@@ -164,27 +169,20 @@
         const btnReset = document.getElementById('reset-cam');
 
         const CANVAS_SIZE = 1024;
-        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 Minutes
-        let cooldownInterval = null;
+        const COOLDOWN_TIME = 5 * 60 * 1000;
         
         let zoomLevels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
-        let currentZoomIndex = 2; 
+        let currentZoomIndex = 2;
 
         function loadLiveCanvas() {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-            
-            fetch('save_backup.php?action=load_live')
-            .then(res => res.json())
-            .then(data => {
-                if (data.image) {
-                    const img = new Image();
-                    img.onload = () => { ctx.drawImage(img, 0, 0); };
-                    img.src = data.image;
-                }
-            })
-            .catch(err => console.error("Error connecting to server image:", err));
-            
+            const savedData = localStorage.getItem('place_live_image_1024');
+            if (savedData) {
+                const img = new Image();
+                img.onload = () => { ctx.drawImage(img, 0, 0); };
+                img.src = savedData;
+            }
             updateZoom();
         }
 
@@ -206,7 +204,7 @@
                     archiveSelect.appendChild(option);
                 });
             })
-            .catch(err => console.error("Error loading archive list:", err));
+            .catch(err => console.error("Error loading archive:", err));
         }
 
         function checkMonthlyBackup() {
@@ -224,7 +222,9 @@
                     })
                 })
                 .then(res => res.json())
-                .then(() => fetchArchiveList());
+                .then(data => {
+                    if (data.status === 'success') fetchArchiveList();
+                });
             }
             localStorage.setItem('place_last_month_checked_1024', currentMonthStr);
         }
@@ -246,22 +246,17 @@
 
         function checkCooldown() {
             const lastPlacement = localStorage.getItem('place_last_placement_time_1024');
-            if (!lastPlacement) {
-                cooldownDisplay.textContent = "Ready!";
-                return true;
-            }
+            if (!lastPlacement) return true;
 
             const elapsed = Date.now() - parseInt(lastPlacement);
             if (elapsed < COOLDOWN_TIME) {
                 startCooldownTimer(COOLDOWN_TIME - elapsed);
                 return false;
             }
-            cooldownDisplay.textContent = "Ready!";
             return true;
         }
 
         function startCooldownTimer(duration) {
-            if (cooldownInterval) clearInterval(cooldownInterval);
             let remaining = Math.ceil(duration / 1000);
             
             function formatTime(secs) {
@@ -272,10 +267,10 @@
 
             cooldownDisplay.textContent = formatTime(remaining);
             
-            cooldownInterval = setInterval(() => {
+            const interval = setInterval(() => {
                 remaining--;
                 if (remaining <= 0) {
-                    clearInterval(cooldownInterval);
+                    clearInterval(interval);
                     cooldownDisplay.textContent = "Ready!";
                 } else {
                     cooldownDisplay.textContent = formatTime(remaining);
@@ -295,25 +290,12 @@
             const pixelY = Math.floor((e.clientY - rect.top) * scaleY);
 
             if (pixelX >= 0 && pixelX < CANVAS_SIZE && pixelY >= 0 && pixelY < CANVAS_SIZE) {
-                const chosenColor = colorPicker.value;
-                
-                localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
-                startCooldownTimer(COOLDOWN_TIME);
-
-                ctx.fillStyle = chosenColor;
+                ctx.fillStyle = colorPicker.value;
                 ctx.fillRect(pixelX, pixelY, 1, 1);
                 
-                fetch('save_backup.php', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'paint',
-                        x: pixelX,
-                        y: pixelY,
-                        color: chosenColor
-                    })
-                })
-                .catch(err => console.error("Server synchronization failed:", err));
+                localStorage.setItem('place_live_image_1024', canvas.toDataURL());
+                localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
+                startCooldownTimer(COOLDOWN_TIME);
             }
         });
 
@@ -344,7 +326,7 @@
         });
 
         btnReset.addEventListener('click', () => {
-            currentZoomIndex = 2; 
+            currentZoomIndex = 2;
             updateZoom();
         });
 
