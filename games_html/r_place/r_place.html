@@ -7,7 +7,8 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -15,67 +16,105 @@
             margin: 0;
             user-select: none;
         }
-        h1 { color: #1a1a1b; margin-bottom: 15px; }
+        h1 {
+            color: #ffffff;
+            margin-bottom: 20px;
+        }
         .controls {
             display: flex;
             gap: 15px;
-            margin-bottom: 15px;
+            margin-bottom: 20px;
             align-items: center;
-            background: white;
-            padding: 10px 20px;
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            padding: 12px 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
             flex-wrap: wrap;
             justify-content: center;
         }
-        .canvas-container {
-            width: 800px;
-            height: 600px;
-            border: 3px solid #ccc;
-            background: #fff;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-            overflow: auto; /* Enable native scrollbars when zoomed in */
-            position: relative;
-        }
-        canvas {
-            image-rendering: pixelated;
-            cursor: crosshair;
-            display: block;
-            transform-origin: top left;
-        }
-        .palette-container {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-            background: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            align-items: center;
-        }
-        .color-picker-wrapper {
+        .control-group {
             display: flex;
             align-items: center;
             gap: 8px;
         }
-        input[type="color"] {
-            border: none;
-            width: 40px;
-            height: 40px;
+        .canvas-container {
+            width: 800px;
+            height: 600px;
+            border: 1px solid #3c3c3c;
+            background-color: #111111;
+            border-radius: 8px;
+            overflow: auto;
+            box-shadow: 0 8px 20px rgba(0,0,0,0.5);
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+            cursor: crosshair;
+            transform-origin: top left;
+        }
+        .palette-area {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 20px;
+            background-color: #252526;
+            border: 1px solid #3c3c3c;
+            padding: 12px 20px;
+            border-radius: 8px;
+        }
+        #color-picker {
+            width: 45px;
+            height: 45px;
+            border: 1px solid #3c3c3c;
             border-radius: 4px;
-            cursor: pointer;
             background: none;
+            cursor: pointer;
         }
-        input[type="color"]:disabled {
+        #color-picker:disabled {
             cursor: not-allowed;
-            opacity: 0.5;
+            opacity: 0.3;
         }
-        .view-mode-indicator { color: #ff4500; font-weight: bold; display: none; }
-        #cooldown { font-weight: bold; color: #ff4500; min-width: 100px; text-align: center; }
-        button, select { padding: 8px 14px; border-radius: 4px; border: 1px solid #ccc; background: white; cursor: pointer; font-size: 14px; }
-        button:hover { background: #f0f0f0; }
-        button:disabled { opacity: 0.5; cursor: not-allowed; }
-        .zoom-display { font-size: 14px; font-weight: bold; color: #444; min-width: 60px; text-align: center; }
+        #cooldown {
+            font-weight: bold;
+            color: #f48771;
+            min-width: 90px;
+        }
+        button, select {
+            padding: 6px 12px;
+            border-radius: 4px;
+            border: 1px solid #3c3c3c;
+            background-color: #2d2d2d;
+            color: #ffffff;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.95rem;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        button:hover:not(:disabled), select:hover {
+            background-color: #3e3e3e;
+            border-color: #4fc1ff;
+        }
+        button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        .view-mode-indicator {
+            color: #f48771;
+            font-weight: bold;
+            display: none;
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            50% { opacity: 1; }
+            100% { opacity: 0.6; }
+        }
+        .instructions {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #777777;
+            text-align: center;
+        }
     </style>
 </head>
 <body>
@@ -83,7 +122,7 @@
     <h1>r/place</h1>
     
     <div class="controls">
-        <div>
+        <div class="control-group">
             <label for="archive-select">📂 Archive:</label>
             <select id="archive-select">
                 <option value="live">-- Current Live Canvas --</option>
@@ -92,78 +131,65 @@
         
         <div id="cooldown">Ready!</div>
         
-        <div>
+        <div class="control-group">
             <button id="zoom-in">🔍 Zoom In</button>
-            <span class="zoom-display" id="zoom-val">100%</span>
             <button id="zoom-out">🔍 Zoom Out</button>
+            <button id="reset-cam">🔄 Reset View</button>
         </div>
 
         <button id="download-btn">📥 Download PNG</button>
+        
         <span id="view-indicator" class="view-mode-indicator">⚠️ ARCHIVE VIEW (Read-Only)</span>
     </div>
 
-    <div class="canvas-container" id="canvas-container">
-        <!-- Native 1024x1024 Canvas -->
+    <div class="canvas-container">
         <canvas id="placeCanvas" width="1024" height="1024"></canvas>
     </div>
 
-    <div class="palette-container" id="palette-container">
-        <div class="color-picker-wrapper">
-            <label for="colorPicker" style="font-size: 14px; font-weight: bold;">Select Color:</label>
-            <input type="color" id="colorPicker" value="#222222">
-        </div>
+    <div class="palette-area">
+        <label for="color-picker" style="font-weight: bold;">Choose Color:</label>
+        <input type="color" id="color-picker" value="#ffffff">
+    </div>
+    
+    <div class="instructions">
+        Use the Zoom buttons to scale the canvas. Native scrollbars will appear automatically to let you navigate.
     </div>
 
     <script>
         const canvas = document.getElementById('placeCanvas');
         const ctx = canvas.getContext('2d');
-        const container = document.getElementById('canvas-container');
         const archiveSelect = document.getElementById('archive-select');
         const viewIndicator = document.getElementById('view-indicator');
         const cooldownDisplay = document.getElementById('cooldown');
-        const colorPicker = document.getElementById('colorPicker');
+        const colorPicker = document.getElementById('color-picker');
         const downloadBtn = document.getElementById('download-btn');
         
         const btnZoomIn = document.getElementById('zoom-in');
         const btnZoomOut = document.getElementById('zoom-out');
-        const zoomVal = document.getElementById('zoom-val');
+        const btnReset = document.getElementById('reset-cam');
 
         const CANVAS_SIZE = 1024;
-        const COOLDOWN_TIME = 5 * 60 * 1000; // 5 Minutes
+        const COOLDOWN_TIME = 5 * 60 * 1000;
         
-        // Zoom configurations
-        const zoomLevels = [0.25, 0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
-        let currentZoomIndex = 3; // Starts at 100% (index 3)
-
-        function updateZoom() {
-            const currentZoom = zoomLevels[currentZoomIndex];
-            
-            // Calculate current scroll center percentages before zoom
-            const scrollLeftPercent = container.scrollLeft / (container.scrollWidth - container.clientWidth || 1);
-            const scrollTopPercent = container.scrollTop / (container.scrollHeight - container.clientHeight || 1);
-            
-            // Set dynamic visual dimensions via styling for native scroll overflow behavior
-            const visualSize = CANVAS_SIZE * currentZoom;
-            canvas.style.width = visualSize + 'px';
-            canvas.style.height = visualSize + 'px';
-            
-            // Render text feedback
-            zoomVal.textContent = Math.round(currentZoom * 100) + '%';
-            
-            // Keep container scrolling positions matching original relative center points
-            container.scrollLeft = scrollLeftPercent * (container.scrollWidth - container.clientWidth);
-            container.scrollTop = scrollTopPercent * (container.scrollHeight - container.clientHeight);
-        }
+        let zoomLevels = [0.5, 0.75, 1, 1.5, 2, 3, 4, 6, 8, 12, 16];
+        let currentZoomIndex = 2;
 
         function loadLiveCanvas() {
             ctx.fillStyle = '#FFFFFF';
             ctx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
-            const savedData = localStorage.getItem('place_live_1024');
+            const savedData = localStorage.getItem('place_live_image_1024');
             if (savedData) {
                 const img = new Image();
-                img.onload = () => ctx.drawImage(img, 0, 0);
+                img.onload = () => { ctx.drawImage(img, 0, 0); };
                 img.src = savedData;
             }
+            updateZoom();
+        }
+
+        function updateZoom() {
+            const factor = zoomLevels[currentZoomIndex];
+            canvas.style.width = (CANVAS_SIZE * factor) + 'px';
+            canvas.style.height = (CANVAS_SIZE * factor) + 'px';
         }
 
         function fetchArchiveList() {
@@ -184,7 +210,7 @@
         function checkMonthlyBackup() {
             const now = new Date();
             const currentMonthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-            const lastCheckedMonth = localStorage.getItem('place_1024_month_checked');
+            const lastCheckedMonth = localStorage.getItem('place_last_month_checked_1024');
 
             if (lastCheckedMonth && lastCheckedMonth !== currentMonthStr) {
                 fetch('save_backup.php', {
@@ -200,7 +226,7 @@
                     if (data.status === 'success') fetchArchiveList();
                 });
             }
-            localStorage.setItem('place_1024_month_checked', currentMonthStr);
+            localStorage.setItem('place_last_month_checked_1024', currentMonthStr);
         }
 
         archiveSelect.addEventListener('change', (e) => {
@@ -214,13 +240,12 @@
                 img.onload = () => ctx.drawImage(img, 0, 0);
                 img.src = path;
                 viewIndicator.style.display = 'inline';
-                colorPicker.disabled = true; // Lock color modifications
+                colorPicker.disabled = true;
             }
         });
 
-        // Cooldown Checks
         function checkCooldown() {
-            const lastPlacement = localStorage.getItem('place_1024_last_time');
+            const lastPlacement = localStorage.getItem('place_last_placement_time_1024');
             if (!lastPlacement) return true;
 
             const elapsed = Date.now() - parseInt(lastPlacement);
@@ -253,42 +278,39 @@
             }, 1000);
         }
 
-        // Handle drawing clicks
         canvas.addEventListener('click', (e) => {
-            if (archiveSelect.value !== 'live') return; // Read-only mode
-            if (!checkCooldown()) return; // Locked by cooldown timer
+            if (archiveSelect.value !== 'live') return;
+            if (!checkCooldown()) return; 
 
-            // Extract relative canvas offsets mapping exact scaled display sizing
             const rect = canvas.getBoundingClientRect();
-            const clickX = e.clientX - rect.left;
-            const clickY = e.clientY - rect.top;
+            const scaleX = CANVAS_SIZE / rect.width;
+            const scaleY = CANVAS_SIZE / rect.height;
 
-            const currentZoom = zoomLevels[currentZoomIndex];
-            const pixelX = Math.floor(clickX / currentZoom);
-            const pixelY = Math.floor(clickY / currentZoom);
+            const pixelX = Math.floor((e.clientX - rect.left) * scaleX);
+            const pixelY = Math.floor((e.clientY - rect.top) * scaleY);
 
             if (pixelX >= 0 && pixelX < CANVAS_SIZE && pixelY >= 0 && pixelY < CANVAS_SIZE) {
                 ctx.fillStyle = colorPicker.value;
                 ctx.fillRect(pixelX, pixelY, 1, 1);
                 
-                localStorage.setItem('place_live_1024', canvas.toDataURL());
-                localStorage.setItem('place_1024_last_time', Date.now().toString());
+                localStorage.setItem('place_live_image_1024', canvas.toDataURL());
+                localStorage.setItem('place_last_placement_time_1024', Date.now().toString());
                 startCooldownTimer(COOLDOWN_TIME);
             }
         });
 
-        // Download currently loaded view state as full raw PNG file
         downloadBtn.addEventListener('click', () => {
-            const selection = archiveSelect.value;
-            const nameSuffix = selection === 'live' ? 'live' : archiveSelect.options[archiveSelect.selectedIndex].text.replace('Snapshot: ', '');
-            
+            const currentSelection = archiveSelect.value;
+            let filename = 'r-place-live.png';
+            if (currentSelection !== 'live') {
+                filename = currentSelection.split('/').pop();
+            }
             const link = document.createElement('a');
-            link.download = `r-place-${nameSuffix}.png`;
+            link.download = filename;
             link.href = canvas.toDataURL();
             link.click();
         });
 
-        // Native button listeners for zooming actions
         btnZoomIn.addEventListener('click', () => {
             if (currentZoomIndex < zoomLevels.length - 1) {
                 currentZoomIndex++;
@@ -303,9 +325,12 @@
             }
         });
 
-        // Core initialization loops
+        btnReset.addEventListener('click', () => {
+            currentZoomIndex = 2;
+            updateZoom();
+        });
+
         loadLiveCanvas();
-        updateZoom();
         fetchArchiveList();
         checkMonthlyBackup();
         checkCooldown();
