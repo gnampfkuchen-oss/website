@@ -35,7 +35,7 @@ main{flex:1;display:flex;min-height:0}
 </head>
 <body>
 <header>
-  <b>🪟 Ad Clicker</b>
+  <b>Ad Clicker</b>
   <span class="stat">💰 $<span id="money">0</span> / $1,000,000 <span class="meter"><i id="bar"></i></span></span>
 </header>
 <main>
@@ -46,12 +46,62 @@ main{flex:1;display:flex;min-height:0}
 
 <script>
 const GOAL=1000000;
-const TEXTS=[["🎰","You WON!"],["📱","Free phone!"],["🔥","Hot singles near you"],["💊","Doctors hate this trick"],["🚗","Car insurance -80%"],["🧙","Grandma's miracle cure"],["💻","Your PC has 37 viruses!"],["🍕","2 for 1 pizza"],["🪙","Crypto millionaire in 3 days"],["👟","Sneaker sale today only"]];
+const TEXTS=[
+["📱","Free phone!"],
+["🔥","Hot singles near you"],
+["💊","Doctors hate this trick"],
+["🚗","Car insurance -80%"],
+["🧙","Grandma's miracle cure"],
+["💻","Your PC has 37 viruses!"],
+["🍕","2 for 1 pizza"],
+["🪙","Crypto millionaire in 3 days"],
+["👟","Sneaker sale today only"],
+["🎁","You are visitor #1,000,000!"],
+["📉","Lose 10 kg by Friday"],
+["🦷","Whiten teeth with this one weird fruit"],
+["💸","Make $5000/day from your couch"],
+["🏝️","Free vacation, just pay shipping"],
+["🔒","Your account was hacked!"],
+["📦","Your package is waiting"],
+["🧴","Anti-aging cream, 90% off"],
+["🎮","Download 10,000 free games"],
+["🛋️","Local mom sells sofa for $1"],
+["👑","Become a prince in Nigeria"],
+["🐱","Cats you won't believe exist"],
+["🧠","Boost your IQ in 5 minutes"],
+["🥤","Energy drink gives you wings"],
+["🕵️","See who viewed your profile"],
+["🎟️","Last chance: free lottery ticket"],
+["🏠","Mortgage rates at 0.01%"],
+["🔋","Phone battery lasts 30 days!"],
+["🦠","Cleaner finds 99 problems"],
+["🍔","Free burger every Monday"],
+["📈","Invest $1, get $1000"],
+["🧲","Magic magnet saves fuel"],
+["🪄","One trick to learn any language"],
+["🎧","Headphones now 95% off"],
+["🛡️","Download our free antivirus"],
+["🐶","Adopt a puppy today"],
+["📞","Unknown caller wants to talk"],
+["💍","Wedding rings from $0.99"],
+["🏆","Congratulations, you are selected!"],
+["🧊","Fridge secret grandma knew"],
+["🚀","Fly to Mars next weekend"],
+["🍀","Lucky number says: click now"],
+["🧾","Delete your debt instantly"],
+["🕶️","Designer sunglasses, fake price"],
+["🎤","Sing like a pro in 1 day"],
+["🌐","Your IP address is exposed!"],
+["📚","Learn to code in 2 hours"],
+["🛒","Mega sale: everything must go"],
+["💼","Work from home, no skills needed"],
+["⏰","Offer ends in 00:00:09"]
+];
 const ups=[
  {id:"big",name:"Bigger X Button",desc:"Easier to hit the close button",base:15,mul:1.6,max:10},
  {id:"val",name:"More Profit",desc:"Each closed ad pays more",base:25,mul:1.7,max:15},
  {id:"fix",name:"Fixed Position",desc:"Ads always appear in the same spot",base:80,mul:1,max:1},
- {id:"auto",name:"Auto Closer",desc:"Automatically closes ads",base:40,mul:1.8,max:10},
+ {id:"auto",name:"Auto Closer",desc:"Automatically closes ads",base:500,mul:3,max:10},
  {id:"blk",name:"Ad Turbo",desc:"Ads appear faster",base:60,mul:1.8,max:12},
  {id:"boom",name:"Click Explosion",desc:"Also closes ads nearby",base:100,mul:2,max:6}
 ];
