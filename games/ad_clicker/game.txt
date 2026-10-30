@@ -1,0 +1,2 @@
+Ad Clicker
+A game where you have to click ad popups away to earn money.

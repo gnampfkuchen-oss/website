@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ad Clicker</title>
+<style>
+:root{color-scheme:dark;--bg:#111827;--fg:#f3f4f6;--card:#1f2937;--line:#374151;--acc:#60a5fa;--bad:#f87171;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font-family:system-ui,-apple-system,"Segoe UI",sans-serif;display:flex;flex-direction:column;overflow:hidden}
+header{display:flex;gap:16px;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--card);border-bottom:1px solid var(--line);flex-wrap:wrap}
+header b{font-size:18px}
+.stat{font-variant-numeric:tabular-nums}
+.meter{width:120px;height:10px;background:var(--line);border-radius:5px;overflow:hidden;display:inline-block;vertical-align:middle;margin-left:6px}
+.meter i{display:block;height:100%;width:0;background:var(--acc);transition:width .2s}
+main{flex:1;display:flex;min-height:0}
+#field{flex:1;position:relative;overflow:hidden}
+#shop{width:250px;background:var(--card);border-left:1px solid var(--line);padding:10px;overflow-y:auto}
+#shop h3{margin:0 0 8px;font-size:15px}
+.up{width:100%;text-align:left;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-bottom:8px;cursor:pointer;font:inherit;font-size:13px}
+.up:disabled{opacity:.45;cursor:not-allowed}
+.up:not(:disabled):hover{border-color:var(--acc)}
+.up strong{display:block;font-size:14px}
+.ad{position:absolute;width:170px;background:var(--card);border:1px solid var(--line);border-radius:6px;box-shadow:0 4px 14px rgba(0,0,0,.5);user-select:none}
+.ad .bar{display:flex;justify-content:space-between;align-items:center;padding:3px 4px 3px 8px;font-size:10px;opacity:.7;border-bottom:1px solid var(--line)}
+.ad .x{background:#dc2626;color:#fff;border:0;border-radius:3px;cursor:pointer;line-height:1;padding:0;font-weight:700}
+.ad .body{padding:10px;font-size:13px;text-align:center}
+.ad .body .e{font-size:30px;display:block}
+#over{position:fixed;inset:0;background:rgba(0,0,0,.75);display:none;align-items:center;justify-content:center;z-index:9999}
+#over div{background:var(--card);padding:24px 32px;border-radius:12px;text-align:center}
+#over button{font:inherit;padding:8px 18px;border-radius:8px;border:0;background:var(--acc);color:#111827;cursor:pointer;margin-top:10px}
+@media (max-width:640px){main{flex-direction:column}#shop{width:100%;height:38%;border-left:0;border-top:1px solid var(--line)}}
+</style>
+</head>
+<body>
+<header>
+  <b>🪟 Ad Clicker</b>
+  <span class="stat">💰 $<span id="money">0</span> / $1,000,000 <span class="meter"><i id="bar"></i></span></span>
+</header>
+<main>
+  <div id="field"></div>
+  <aside id="shop"><h3>🛒 Upgrades</h3><div id="ups"></div></aside>
+</main>
+<div id="over"><div><h2>🎉 You made $1,000,000!</h2><p id="res"></p><button id="again">Play again</button></div></div>
+
+<script>
+const GOAL=1000000;
+const TEXTS=[["🎰","You WON!"],["📱","Free phone!"],["🔥","Hot singles near you"],["💊","Doctors hate this trick"],["🚗","Car insurance -80%"],["🧙","Grandma's miracle cure"],["💻","Your PC has 37 viruses!"],["🍕","2 for 1 pizza"],["🪙","Crypto millionaire in 3 days"],["👟","Sneaker sale today only"]];
+const ups=[
+ {id:"big",name:"Bigger X Button",desc:"Easier to hit the close button",base:15,mul:1.6,max:10},
+ {id:"val",name:"More Profit",desc:"Each closed ad pays more",base:25,mul:1.7,max:15},
+ {id:"fix",name:"Fixed Position",desc:"Ads always appear in the same spot",base:80,mul:1,max:1},
+ {id:"auto",name:"Auto Closer",desc:"Automatically closes ads",base:40,mul:1.8,max:10},
+ {id:"blk",name:"Ad Turbo",desc:"Ads appear faster",base:60,mul:1.8,max:12},
+ {id:"boom",name:"Click Explosion",desc:"Also closes ads nearby",base:100,mul:2,max:6}
+];
+let S;
+const $=id=>document.getElementById(id), field=$("field");
+const fmt=n=>n.toLocaleString("en-US");
+
+function init(){
+  field.innerHTML="";
+  S={money:0,ads:[],lv:{},t0:Date.now(),nextSpawn:Date.now()+2000,nextAuto:0,over:false,fixed:null};
+  ups.forEach(u=>S.lv[u.id]=0);
+  $("over").style.display="none";
+  buildShop();render();
+}
+function reward(){return Math.round(Math.pow(1.5,S.lv.val))}
+function cost(u){return Math.round(u.base*Math.pow(u.mul,S.lv[u.id]))}
+function buildShop(){
+  $("ups").innerHTML="";
+  ups.forEach(u=>{
+    const b=document.createElement("button");b.className="up";b.id="up_"+u.id;
+    b.onclick=()=>{
+      if(S.over||S.lv[u.id]>=u.max||S.money<cost(u))return;
+      S.money-=cost(u);S.lv[u.id]++;
+      if(u.id==="fix")S.fixed=null;
+      if(u.id==="big")S.ads.forEach(a=>sizeX(a.el));
+      render();
+    };
+    $("ups").appendChild(b);
+  });
+}
+function render(){
+  $("money").textContent=fmt(S.money);
+  $("bar").style.width=Math.min(100,S.money/GOAL*100)+"%";
+  ups.forEach(u=>{
+    const b=$("up_"+u.id),l=S.lv[u.id],m=l>=u.max;
+    b.disabled=m||S.money<cost(u);
+    b.innerHTML="<strong>"+u.name+" (Lv "+l+(u.max>1?"/"+u.max:"")+")</strong>"+u.desc+"<br>"+(m?"✔ Maxed out":"Cost: $"+fmt(cost(u)));
+  });
+}
+function sizeX(el){
+  const x=el.querySelector(".x"),s=12+S.lv.big*4;
+  x.style.width=s+"px";x.style.height=s+"px";x.style.fontSize=(s-4)+"px";
+}
+function spawn(){
+  const fw=field.clientWidth,fh=field.clientHeight,aw=170,ah=100;
+  let x,y;
+  if(S.lv.fix){
+    if(!S.fixed)S.fixed={x:Math.max(0,(fw-aw)/2),y:Math.max(0,(fh-ah)/2)};
+    x=S.fixed.x;y=S.fixed.y;
+  }else{
+    x=Math.random()*Math.max(1,fw-aw);y=Math.random()*Math.max(1,fh-ah);
+  }
+  const t=TEXTS[Math.floor(Math.random()*TEXTS.length)];
+  const el=document.createElement("div");el.className="ad";
+  el.style.left=x+"px";el.style.top=y+"px";
+  el.innerHTML='<div class="bar"><span>Ad</span><button class="x">×</button></div><div class="body"><span class="e">'+t[0]+'</span>'+t[1]+'</div>';
+  const ad={el,x,y};
+  el.querySelector(".x").onclick=e=>{e.stopPropagation();closeAd(ad,true)};
+  field.appendChild(el);S.ads.push(ad);sizeX(el);
+}
+function closeAd(ad,manual){
+  const i=S.ads.indexOf(ad);if(i<0||S.over)return;
+  S.ads.splice(i,1);ad.el.remove();S.money+=reward();
+  if(manual&&S.lv.boom){
+    const r=50*S.lv.boom;
+    S.ads.slice().forEach(o=>{if(Math.hypot(o.x-ad.x,o.y-ad.y)<=r){
+      const j=S.ads.indexOf(o);S.ads.splice(j,1);o.el.remove();S.money+=reward();}});
+  }
+  render();
+  if(S.money>=GOAL)win();
+}
+function win(){
+  S.over=true;
+  const sec=Math.floor((Date.now()-S.t0)/1000);
+  $("res").textContent="Time: "+Math.floor(sec/60)+"m "+(sec%60)+"s";
+  $("over").style.display="flex";
+}
+setInterval(()=>{
+  if(S.over)return;
+  const now=Date.now();
+  if(now>=S.nextSpawn){
+    spawn();
+    S.nextSpawn=now+2000*Math.pow(0.85,S.lv.blk);
+  }
+  if(S.lv.auto&&now>=S.nextAuto){
+    S.nextAuto=now+3000/(1+S.lv.auto*0.8);
+    if(S.ads.length)closeAd(S.ads[0],false);
+  }
+},100);
+$("again").onclick=init;
+init();
+</script>
+</body>
+</html>
